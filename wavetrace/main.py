@@ -324,6 +324,7 @@ def get_covering_tiles_ids(transmitters, transmitter_buffer=0.5):
     As long as ``tile_ids`` and ``transmitter_buffer`` are big enough, the result will be a list of tile IDs to use when computing coverage for the given transmitters.
     The defaults are appropriate for transmitters in Guinea.
 
+
     NOTES:
         - Regarding the transmitter buffer, one degree of latitude represents about 111 km on the ground and one degree of longitude at -45 degrees latitude represents about 78 km on the ground; see https://en.wikipedia.org/wiki/Decimal_degrees
     """
@@ -335,6 +336,8 @@ def get_covering_tiles_ids(transmitters, transmitter_buffer=0.5):
 def download_topography(tile_ids, path, high_definition=False):
     """
     Download from the public Gitlab repository https://gitlab.com/jblack020-group/srtm_data_guinea the SRTM3 topography data corresponding to the given SRTM tile IDs and save the files to the directory ``path``, creating the directory if it does not exist.
+
+    All files on the repo are downloaded from the NASA SRTM data, found on Earthdata.
 
     INPUT:
         - ``tile_ids``: list of strings; SRTM tile IDs
