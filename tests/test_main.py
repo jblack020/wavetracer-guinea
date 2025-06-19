@@ -1,28 +1,29 @@
 import unittest
-from pathlib import Path 
+from pathlib import Path
 from copy import copy
 import shutil
 
-from .context import wavetrace
+from context import wavetrace
 from wavetrace import *
 
 
 DATA_DIR = PROJECT_ROOT/'tests'/'data'
 TRANSMITTER_1 = {
- 'antenna_downtilt': '1',
- 'antenna_height': 20.0,
- 'bearing': '0',
- 'frequency': 5725.0,
- 'horizontal_beamwidth': '90',
- 'latitude': -35.658841,
- 'longitude': 174.281534,
- 'name': 'MyNetwork_5',
- 'network_name': 'My Network',
- 'polarization': 0.0,
- 'power_eirp': 4.0,
- 'site_name': '5',
- 'vertical_beamwidth': '30',
- }
+    'antenna_downtilt': '1',
+    'antenna_height': 20.0,
+    'bearing': '0',
+    'frequency': 5725.0,
+    'horizontal_beamwidth': '90',
+    'latitude': -35.658841,
+    'longitude': 174.281534,
+    'name': 'MyNetwork_5',
+    'network_name': 'My Network',
+    'polarization': 0.0,
+    'power_eirp': 4.0,
+    'site_name': '5',
+    'vertical_beamwidth': '30',
+}
+
 
 class TestMain(unittest.TestCase):
 
@@ -31,9 +32,9 @@ class TestMain(unittest.TestCase):
         tmp = DATA_DIR/'tmp'
 
         # Should download correct files
-        tiles = ['S36E174', 'S37E175'] 
-        for hd, suffix in [(True, '.SRTMGL1.hgt.zip'), 
-          (False, '.SRTMGL3.hgt.zip')]:
+        tiles = ['S36E174', 'S37E175']
+        for hd, suffix in [(True, '.SRTMGL1.hgt.zip'),
+                           (False, '.SRTMGL3.hgt.zip')]:
             rm_paths(tmp)
             download_topography(tiles, path=tmp, high_definition=hd)
             get_names = [f.name for f in tmp.iterdir()]
@@ -43,8 +44,8 @@ class TestMain(unittest.TestCase):
         # Should raise ValueError on bad tiles
         tiles = ['S36E174', 'N00E000']
         for hd in [True, False]:
-            self.assertRaises(ValueError, download_topography, tile_ids=tiles, 
-              path=tmp, high_definition=hd)
+            self.assertRaises(ValueError, download_topography, tile_ids=tiles,
+                              path=tmp, high_definition=hd)
 
         rm_paths(tmp)
 
@@ -56,8 +57,8 @@ class TestMain(unittest.TestCase):
         # Should contain the correct number of transmitters
         self.assertEqual(len(ts), 20)
 
-        float_fields = ['latitude', 'longitude', 'antenna_height', 
-          'polarization', 'frequency', 'power_eirp']
+        float_fields = ['latitude', 'longitude', 'antenna_height',
+                        'polarization', 'frequency', 'power_eirp']
         for t in ts:
             # Should contain the required fields
             self.assertTrue(set(REQUIRED_TRANSMITTER_FIELDS) <= set(t.keys()))
@@ -129,17 +130,17 @@ class TestMain(unittest.TestCase):
         # Should contain the correct files
         names_get = [f.name for f in out_path.iterdir()]
         names_expect = [t['name'] + suffix
-          for t in read_transmitters(in_path)
-          for suffix in ['.qth', '.lrp', '.az', '.el']]
+                        for t in read_transmitters(in_path)
+                        for suffix in ['.qth', '.lrp', '.az', '.el']]
         self.assertCountEqual(names_get, names_expect)
 
         rm_paths(out_path)
 
     def test_get_lonlats(self):
         ts = [
-          {'longitude': 5.6, 'latitude': -20.4},
-          {'longitude': 7.6, 'latitude': 18},
-          ]
+            {'longitude': 5.6, 'latitude': -20.4},
+            {'longitude': 7.6, 'latitude': 18},
+        ]
         get = get_lonlats(ts)
         expect = [(5.6, -20.4), (7.6, 18)]
         self.assertSequenceEqual(get, expect)
@@ -158,11 +159,11 @@ class TestMain(unittest.TestCase):
                 suffix = '-hd.sdf'
             else:
                 in_path = DATA_DIR/'srtm3'
-                names_expect = ['-36:-35:185:186.sdf', 
-                  '-37:-36:184:185.sdf']
+                names_expect = ['-36:-35:185:186.sdf',
+                                '-37:-36:184:185.sdf']
 
-            process_topography(in_path, out_path, 
-              high_definition=hd)
+            process_topography(in_path, out_path,
+                               high_definition=hd)
 
             # Should contain the correct files
             names_get = [f.name for f in out_path.iterdir()]
@@ -176,17 +177,17 @@ class TestMain(unittest.TestCase):
         p3 = DATA_DIR/'tmp_outputs'
 
         rm_paths(p2, p3)
- 
+
         # High definition tests take too long, so skip them
         process_transmitters(p1/'transmitters_single.csv', p2)
-        process_topography( p1/'srtm3', p2)
+        process_topography(p1/'srtm3', p2)
         compute_coverage_0(p2, p3)
 
         # Should contain the correct files
         names_get = [f.name for f in p3.iterdir()]
         names_expect = [t['name'] + suffix
-          for t in read_transmitters(p1/'transmitters_single.csv')
-          for suffix in ['.ppm', '-ck.ppm', '.kml', '-site_report.txt']]
+                        for t in read_transmitters(p1/'transmitters_single.csv')
+                        for suffix in ['.ppm', '-ck.ppm', '.kml', '-site_report.txt']]
         self.assertCountEqual(names_get, names_expect)
 
         rm_paths(p2, p3)
@@ -215,9 +216,9 @@ class TestMain(unittest.TestCase):
         # Should contain the correct files
         names_get = [f.name for f in p3.iterdir()]
         names_expect = [t['name'] + suffix
-          for t in transmitters
-          for suffix in ['.ppm', '-ck.ppm', '.kml', '-site_report.txt', 
-            '.png', '-ck.png', '.tif', '.dbf', '.prj', '.shp', '.shx']]
+                        for t in transmitters
+                        for suffix in ['.ppm', '-ck.ppm', '.kml', '-site_report.txt',
+                                       '.png', '-ck.png', '.tif', '.dbf', '.prj', '.shp', '.shx']]
         self.assertCountEqual(names_get, names_expect)
 
         # KML should have PNG references
@@ -235,18 +236,18 @@ class TestMain(unittest.TestCase):
         p2 = DATA_DIR/'tmp_inputs'
         p3 = DATA_DIR/'tmp_outputs'
         rm_paths(p2, p3)
- 
+
         # High definition tests take too long, so skip them
         process_transmitters(p1/'transmitters_single.csv', p2)
-        process_topography( p1/'srtm3', p2)
+        process_topography(p1/'srtm3', p2)
         compute_coverage(p2, p3, keep_ppm=False, make_shp=True)
 
         # Should contain the correct files
         names_get = [f.name for f in p3.iterdir()]
         names_expect = [t['name'] + suffix
-          for t in read_transmitters(p1/'transmitters_single.csv')
-          for suffix in ['.kml', '-site_report.txt', 
-            '.png', '-ck.png', '.tif', '.dbf', '.prj', '.shp', '.shx']]
+                        for t in read_transmitters(p1/'transmitters_single.csv')
+                        for suffix in ['.kml', '-site_report.txt',
+                                       '.png', '-ck.png', '.tif', '.dbf', '.prj', '.shp', '.shx']]
         self.assertCountEqual(names_get, names_expect)
 
         rm_paths(p2, p3)
@@ -283,15 +284,15 @@ class TestMain(unittest.TestCase):
             get_az, get_el = compute_look_angles(0, 45, 0, lon_s)
             self.assertAlmostEqual(get_az, az, places=decimals)
             self.assertAlmostEqual(get_el, el, places=decimals)
-            
+
     def test_partition(self):
         n = 3
         subtiles = partition(10, 10, n)
         # Should be the correct length
         self.assertEqual(len(subtiles), n**2)
         # Each subtile item should have the correct length
-        self.assertSequenceEqual([len(s) for s in subtiles], 
-          [4 for i in range(n**2)])
+        self.assertSequenceEqual([len(s) for s in subtiles],
+                                 [4 for i in range(n**2)])
         # Should be correct on an example subtile
         expect = (6, 0, 4, 3)
         self.assertSequenceEqual(subtiles[2], expect)

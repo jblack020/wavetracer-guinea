@@ -8,7 +8,7 @@ import datetime as dt
 import json
 from math import ceil, floor
 from itertools import product
-from pathlib import Path 
+from pathlib import Path
 import shutil
 import re
 import subprocess
@@ -32,9 +32,10 @@ def time_it(f):
         result = f(*args, **kwargs)
         t2 = dt.datetime.now()
         minutes = (t2 - t1).seconds/60
-        print(t2, '  Finished in %.2f min' % minutes)    
+        print(t2, '  Finished in %.2f min' % minutes)
         return result
     return wrap
+
 
 def rm_paths(*paths):
     """
@@ -48,6 +49,7 @@ def rm_paths(*paths):
             else:
                 shutil.rmtree(str(p))
 
+
 def check_lonlat(lon, lat):
     """
     Raise a ``ValueError`` if ``lon`` and ``lat`` do not represent a valid 
@@ -58,6 +60,7 @@ def check_lonlat(lon, lat):
         raise ValueError('Longitude {!s} is out of bounds'.format(lon))
     if not (-90 <= lat <= 90):
         raise ValueError('Latitude {!s} is out of bounds'.format(lat))
+
 
 def check_tile_id(tile_id):
     """
@@ -72,9 +75,10 @@ def check_tile_id(tile_id):
         lon = int(t[4:])
     except:
         raise ValueError(msg)
-    if not(t[0] in ['N', 'S'] and t[3] in ['E', 'W'] and\
-      0 <= lat <= 90 and 0 <= lon <= 180):
+    if not (t[0] in ['N', 'S'] and t[3] in ['E', 'W'] and
+            0 <= lat <= 90 and 0 <= lon <= 180):
         raise ValueError(msg)
+
 
 def get_bounds(tile_id, be_precise=None):
     """
@@ -118,8 +122,9 @@ def get_bounds(tile_id, be_precise=None):
     else:
         delta = 0
 
-    return [min_lon - delta, min_lat - delta, 
-      min_lon + 1 + delta, min_lat + 1 + delta]
+    return [min_lon - delta, min_lat - delta,
+            min_lon + 1 + delta, min_lat + 1 + delta]
+
 
 def build_polygon(tile_id, be_precise=None):
     """
@@ -127,6 +132,7 @@ def build_polygon(tile_id, be_precise=None):
     Use the same ``be_precise`` keyword as in :func:`get_bounds`.
     """
     return box(*get_bounds(tile_id, be_precise))
+
 
 def build_feature(tile_id, be_precise=None):
     """
@@ -137,7 +143,8 @@ def build_feature(tile_id, be_precise=None):
         'type': 'Feature',
         'properties': {'tile_id': tile_id},
         'geometry': mapping(build_polygon(tile_id, be_precise))
-        }
+    }
+
 
 def get_tile_id(tile_path):
     """
@@ -146,6 +153,7 @@ def get_tile_id(tile_path):
     """
     path = Path(tile_path)
     return path.stem.split('.')[0]
+
 
 def get_covering_tile_id(lon, lat):
     """
@@ -157,7 +165,7 @@ def get_covering_tile_id(lon, lat):
 
     OUTPUT:
         SRTM tile ID (string)
-    
+
     EXAMPLES:
 
     >>> get_covering_tile_id(27.5, 3.64)
@@ -182,9 +190,10 @@ def get_covering_tile_id(lon, lat):
         prefix = 'S'
     lat = prefix + '{:02d}'.format(aflat)
 
-    return lat + lon 
+    return lat + lon
 
-def compute_intersecting_tiles(geometries, tile_ids=cs.SRTM_NZ_TILE_IDS):
+
+def compute_intersecting_tiles(geometries, tile_ids=cs.SRTM_GIN_TILE_IDS):
     """
     Given a list of Shapely geometries in WGS84 coordinates, return an ordered list of the unique SRTM tile IDs in ``tile_ids`` whose corresponding tiles intersect the geometries.
 
@@ -200,6 +209,7 @@ def compute_intersecting_tiles(geometries, tile_ids=cs.SRTM_NZ_TILE_IDS):
                 break
     return sorted(result)
 
+
 def gdalinfo(path):
     """
     Given the path to an raster file, run ``gdalinfo`` on the file and extract and return from the result a dictionary with the following keys and values:
@@ -210,15 +220,15 @@ def gdalinfo(path):
     """
     path = Path(path)
     args = ['gdalinfo', str(path)]
-    sp = subprocess.run(args, 
-      stdout=subprocess.PIPE, universal_newlines=True, check=True)
+    sp = subprocess.run(args,
+                        stdout=subprocess.PIPE, universal_newlines=True, check=True)
     text = sp.stdout
     m = re.search(r'Size is (\d+), (\d+)', text)
     width, height = map(int, m.group(1, 2))
     m = re.search(r'Center\s*\(\s*([\d\.\-]+),\s*([\d\.\-]+)\s*\)', text)
     center0, center1 = map(float, m.group(1, 2))
     return {
-        'width': width, 
+        'width': width,
         'height': height,
         'center': (center0, center1),
-        }    
+    }
