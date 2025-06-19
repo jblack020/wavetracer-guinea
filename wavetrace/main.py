@@ -15,7 +15,7 @@ import urllib
 import time
 from shapely.geometry import Point
 import requests
-
+from tqdm import tqdm
 import wavetrace.constants as cs
 import wavetrace.utilities as ut
 
@@ -367,7 +367,7 @@ def download_topography(tile_ids, path, high_definition=False):
 
     # Download
     params = {'ref': 'main', }
-    for file_name in file_names:
+    for file_name in tqdm(file_names, total=len(file_names), desc="Downloading topography data"):
         file_url = '{url}{file_id}'.format(
             url=url,
             file_id=urllib.parse.quote_plus(file_name))
@@ -416,7 +416,7 @@ def process_topography(in_path, out_path, high_definition=False):
 
     sdf_pattern = re.compile(r"[\d\w\-\:]+\.sdf")
 
-    for f in in_path.iterdir():
+    for f in tqdm(in_path.iterdir(), total=len(list(in_path.iterdir())), desc="Converting topography data to SDF"):
         if not (f.name.endswith('.hgt') or f.name.endswith('.hgt.zip')):
             continue
 
@@ -492,7 +492,7 @@ def compute_coverage_0(in_path, out_path, transmitters=None,
     if high_definition:
         splat += '-hd'
 
-    for t in transmitter_names:
+    for t in tqdm(transmitter_names, total=len(transmitter_names), desc="Computing coverage"):
         args = [splat, '-t', t + '.qth', '-L', '8.0', '-dbm', '-db',
                 str(receiver_sensitivity), '-metric', '-ngs', '-kml', '-ppm',
                 '-o', t + '.ppm']
