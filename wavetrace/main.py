@@ -458,14 +458,14 @@ def compute_coverage_0(in_path, out_path, transmitters=None,
 
     - ``'<transmitter name>-site_report.txt'``
     - ``'<transmitter name>.kml'``: KML file containing transmitter feature and ``'<transmitter name>.ppm'``
-    - ``'<transmitter name>.ppm'``: PPM file depicting a contour plot of the transmitter signal strength
-    - ``'<transmitter name>-ck.ppm'``: PPM file depicting a legend for the signal strengths in ``'<transmitter name>.ppm'``
+    - ``'<transmitter name>.ppm'``: PPM file depicting a contour plot of the transmitter field strength in dBμV/m
+    - ``'<transmitter name>-ck.ppm'``: PPM file depicting a legend for the field strengths in ``'<transmitter name>.ppm'``
 
     INPUT:
         - ``in_path``: string or Path object specifying a directory; all the SPLAT! transmitter and elevation data should lie here
         - ``out_path``: string or Path object specifying a directory
         - ``transmitters``: list of transmitter dictionaries (in the form output by :func:`read_transmitters`) to restrict to; if ``None``, then all transmitters in ``in_path`` will be used
-        - ``receiver_sensitivity``: float; measured in decibels; path loss threshold beyond which signal strength contours will not be plotted
+        - ``receiver_sensitivity``: float; measured in dBμV/m; field strength threshold beyond which signal strength contours will not be plotted
         - ``high_definition``: boolean
 
     OUTPUT:
@@ -494,7 +494,7 @@ def compute_coverage_0(in_path, out_path, transmitters=None,
         splat += '-hd'
 
     for t in transmitter_names:
-        args = [splat, '-t', t + '.qth', '-L', '8.0', '-dbm', '-db',
+        args = [splat, '-t', t + '.qth', '-L', '8.0', '-db',
                 str(receiver_sensitivity), '-metric', '-ngs', '-kml', '-ppm',
                 '-o', t + '.ppm']
         subprocess.run(args, cwd=str(in_path),
