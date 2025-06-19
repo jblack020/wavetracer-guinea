@@ -368,6 +368,7 @@ def download_topography(tile_ids, path, high_definition=False):
     # Download
     params = {'ref': 'main', }
     for file_name in tqdm(file_names, total=len(file_names), desc="Downloading topography data"):
+        time.sleep(20)
         file_url = '{url}{file_id}'.format(
             url=url,
             file_id=urllib.parse.quote_plus(file_name))
@@ -381,8 +382,6 @@ def download_topography(tile_ids, path, high_definition=False):
         with p.open('wb') as tgt:
             content = base64.b64decode(r.json()['content'])
             tgt.write(content)
-
-        time.sleep(20)
 
 
 def process_topography(in_path, out_path, high_definition=False):
