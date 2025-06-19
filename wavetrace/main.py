@@ -382,7 +382,9 @@ def download_topography(tile_ids, path, high_definition=False):
             content = base64.b64decode(r.json()['content'])
             tgt.write(content)
 
-        time.sleep(1)   # Sleep for 1 second to avoid rate limiting
+        # Sleep for 12 seconds to respect GitLab's 5 requests per minute limit
+        buffer = 2  # Add a buffer to avoid hitting the limit
+        time.sleep(12 + buffer)
 
 
 def process_topography(in_path, out_path, high_definition=False):
