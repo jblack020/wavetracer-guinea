@@ -366,7 +366,7 @@ def download_topography(tile_ids, path, high_definition=False):
         path.mkdir(parents=True)
 
     # Download
-    params = {'ref': 'master', }
+    params = {'ref': 'main', }
     for file_name in file_names:
         file_url = '{url}{file_id}'.format(
             url=url,

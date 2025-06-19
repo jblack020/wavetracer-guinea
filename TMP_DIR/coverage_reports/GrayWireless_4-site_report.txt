@@ -1,0 +1,11 @@
+
+	--==[ SPLAT! v1.4.2 Site Analysis Report For: GrayWireless_4 ]==--
+
+---------------------------------------------------------------------------
+
+Site location: 35.7122 South / 185.6635 West (-35° 42' 44" S / 185° 39' 48" W)
+Ground elevation: 0.00 meters AMSL
+Antenna height: 10.00 meters AGL / 10.00 meters AMSL
+
+---------------------------------------------------------------------------
+
