@@ -1,11 +1,5 @@
 from setuptools import setup, find_packages
 
-with open('README.rst') as f:
-    readme = f.read()
-
-with open('LICENSE.txt') as f:
-    license = f.read()
-
 setup(
     name='wavetrace-guinea',
     version='4.0.4',
@@ -16,7 +10,6 @@ setup(
     license=license,
     data_files=[('', ['LICENSE.txt'])],
     description='A fork of wavetrace to produce radio signal coverage reports for Guinea instead of New Zealand',
-    long_description=readme,
     long_description_content_type='text/x-rst',
     install_requires=[
         'requests>=2.20.0',
