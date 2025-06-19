@@ -133,10 +133,8 @@ FRACTION_OF_TIME = 0.5
 #: SPLAT! location variability parameter
 FRACTION_OF_SITUATIONS = 0.5
 
-#: SPLAT receiver sensitivity parameter in dBμV/m (decibels relative to one microvolt per meter).
-#: This sets the field strength threshold beyond which contours will not be plotted.
-#: Very low values like -110 dBμV/m will effectively plot all field strength contours.
-#: For reference, typical TV service thresholds are 28-48 dBμV/m depending on frequency band.
+#: SPLAT receiver sensitivity parameter in decibel-milliwatts (dBm).
+#: For example, minimum received signal power of wireless networks (802.11 variants) is -100 dBm.
 RECEIVER_SENSITIVITY = -110
 #: WGS84 semimajor axis in meters
 WGS84_A = 6378137
