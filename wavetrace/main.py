@@ -12,7 +12,7 @@ import base64
 from math import sin, cos, atan, atan2, sqrt, pi, radians, degrees
 import tempfile
 import urllib
-
+import time
 from shapely.geometry import Point
 import requests
 
@@ -381,6 +381,8 @@ def download_topography(tile_ids, path, high_definition=False):
         with p.open('wb') as tgt:
             content = base64.b64decode(r.json()['content'])
             tgt.write(content)
+
+        time.sleep(1)   # Sleep for 1 second to avoid rate limiting
 
 
 def process_topography(in_path, out_path, high_definition=False):
