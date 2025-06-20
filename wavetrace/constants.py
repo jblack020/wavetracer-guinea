@@ -138,7 +138,7 @@ FRACTION_OF_SITUATIONS = 0.5
 RECEIVER_SENSITIVITY = 43  # dBμV/m
 
 #: SPLAT maximum coverage radius in kilometers
-COVERAGE_RADIUS = 100.0
+COVERAGE_RADIUS = 50.0
 
 #: WGS84 semimajor axis in meters
 WGS84_A = 6378137
