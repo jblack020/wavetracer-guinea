@@ -510,6 +510,8 @@ def compute_coverage_0(in_path, out_path, transmitters,
         rx_thresh = dbuvm_to_dbm(receiver_sensitivity,
                                  f_mhz)     # 60 dBµV/m → dBm
 
+        print(f"Transmitter {t} has sensitivity {rx_thresh} dBm")
+
         args = [splat, '-t', t + '.qth', '-L', '8.0', '-dbm', '-db',
                 str(rx_thresh), '-metric', '-ngs', '-kml', '-ppm',
                 '-o', t + '.ppm']
