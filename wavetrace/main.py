@@ -18,7 +18,20 @@ import requests
 from tqdm import tqdm
 import wavetrace.constants as cs
 import wavetrace.utilities as ut
-import math
+import pandas as pd
+import geopandas as gpd
+import numpy as np
+import subprocess
+import tempfile
+import shutil
+import pandas as pd
+import geopandas as gpd
+import numpy as np
+import rasterio
+from rasterio import features
+from shapely.geometry import shape
+from pathlib import Path
+
 
 # In the calls to the subprocess function below,
 # sometimes instead of using absolute paths,
@@ -26,14 +39,12 @@ import math
 # Mind the difference!
 
 
-def dbuvm_to_dbm(e_dbuvm: float, f_mhz: float, g_dbi: float = 0.0) -> float:
+# Convert power_eirp to ERP for use in SPLAT!
+def eirp_to_erp(eirp: float) -> float:
     """
-    60 dBµV/m → ? dBm for a given frequency.
-
-    Formula (ITU-R, FCC, SPLAT! docs):
-        P(dBm) = E(dBµV/m) - 77.2 - 20·log10(f_MHz) + G(dBi)
+    Convert EIRP to ERP.
     """
-    return e_dbuvm - 77.2 - 20.0 * math.log10(f_mhz) + g_dbi
+    return eirp / 1.643
 
 
 def process_transmitters(in_path, out_path,
@@ -458,8 +469,6 @@ def process_topography(in_path, out_path, high_definition=False):
 
 
 def compute_coverage_0(in_path, out_path, transmitters,
-                       receiver_sensitivity=cs.RECEIVER_SENSITIVITY,
-                       coverage_radius=cs.COVERAGE_RADIUS,
                        high_definition=False):
     """
     Create a SPLAT! coverage report for every transmitter with data located at ``in_path``, or if ``transmitters`` is given, then every transmitter 
@@ -477,7 +486,6 @@ def compute_coverage_0(in_path, out_path, transmitters,
         - ``out_path``: string or Path object specifying a directory
         - ``transmitters``: list of transmitter dictionaries (in the form output by :func:`read_transmitters`) to grab the frequencies of to convert dBμV/m to dBm (SPLAT! uses dBm)
         - ``receiver_sensitivity``: float; desired path loss threshold beyond which signal strength contours will not be plotted (measured in dBμV/m)
-        - ``coverage_radius``: float; maximum coverage radius in kilometers for SPLAT calculations
         - ``high_definition``: boolean
 
     OUTPUT:
@@ -508,21 +516,30 @@ def compute_coverage_0(in_path, out_path, transmitters,
         splat += '-hd'
 
     for t in tqdm(transmitter_names, total=len(transmitter_names), desc="Computing coverage"):
-        f_mhz = tx_index[t]['frequency']         # each tx has its own freq
-        rx_thresh = dbuvm_to_dbm(receiver_sensitivity,
-                                 f_mhz)     # 60 dBµV/m → dBm
-
-        print(f"Transmitter {t} has sensitivity {rx_thresh} dBm")
+        power_erp = eirp_to_erp(tx_index[t]['power_eirp'])
 
         # build splat argument list
-        args = [splat, '-t', t + '.qth', '-L', '8.0', '-R', str(coverage_radius), '-dbm', '-db',
-                str(rx_thresh), '-metric', '-ngs', '-kml', '-ppm',
-                '-o', t + '.ppm']
-        subprocess.run(args, cwd=str(in_path),
-                       stdout=subprocess.PIPE, universal_newlines=True, check=True)
+        args = [
+            splat,
+            '-t', f'{t}.qth',
+            '-L', '8.0',  # Rx height (m or ft)
+            '-metric', '-ngs',  # Use metres, hide greyscale topo
+            '-kml',  # Google-Earth overlay (optional)
+            '-ano', f'{t}.dat',  # alphanumeric output file
+            '-o', f'{t}.ppm',  # Colour contour map
+            '-erp', str(power_erp)  # ERP
+        ]
+
+        subprocess.run(
+            args,
+            cwd=str(in_path),
+            stdout=subprocess.PIPE,
+            universal_newlines=True,
+            check=True
+        )
 
     # Move outputs to out_path
-    exts = ['.ppm', '-ck.ppm', '-site_report.txt', '.kml']
+    exts = ['.ppm', '-ck.ppm', '-site_report.txt', '.kml', '.dat']
     for t in transmitter_names:
         for ext in exts:
             src = in_path/(t + ext)
@@ -601,6 +618,64 @@ def postprocess_coverage_0(path, keep_ppm, make_shp):
                                stdout=subprocess.PIPE, universal_newlines=True, check=True)
 
 
+def post_process_coverage_1(dat_path,
+                            receiver_sensitivity,
+                            out_dir=None,
+                            crs="EPSG:4326",
+                            pixel_deg=0.0025):
+    """
+    Read SPLAT *.dat* and keep val > threshold. Burn those cells into a boolean raster. Polygonise contiguous True cells. Write Shapefile + PNG.
+    """
+    dat_path = Path(dat_path)
+    if out_dir is None:
+        out_dir = dat_path.parent
+    out_dir = Path(str(out_dir) + "_vector")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stem = dat_path.stem
+
+    # ── 1. read + filter ────────────────────────────────────────────────
+    cols = ["lat_n", "lon_w", "az", "el", "val"]
+    df = (pd.read_csv(dat_path, skiprows=2, names=cols)
+          .apply(pd.to_numeric, errors="coerce")
+          .dropna())
+    df["lon"] = -df.lon_w
+    df = df[(df.el > -90) & (df.val > receiver_sensitivity)]
+    if df.empty:
+        raise ValueError("Threshold filters out every point.")
+
+    # ── 2. build target raster grid ─────────────────────────────────────
+    xmin, xmax = df.lon.min(), df.lon.max()
+    ymin, ymax = df.lat_n.min(), df.lat_n.max()
+    width = int(np.ceil((xmax - xmin) / pixel_deg))
+    height = int(np.ceil((ymax - ymin) / pixel_deg))
+    transform = rasterio.transform.from_origin(
+        xmin, ymax, pixel_deg, pixel_deg)
+
+    # ── 3. burn points ----------------------------------------------------------------
+    # Snap each point to its row / col index; duplicates are cheap
+    rows = ((ymax - df.lat_n) / pixel_deg).astype(int)
+    cols = ((df.lon - xmin) / pixel_deg).astype(int)
+    raster = np.zeros((height, width), dtype="uint8")
+    raster[rows, cols] = 1          # set covered cells to 1
+
+    # ── 4. polygonise contiguous cells -----------------------------------------------
+    shapes = features.shapes(
+        raster, mask=raster.astype(bool), transform=transform)
+    polys = [shape(geom) for geom, value in shapes if value == 1]
+
+    gdf = gpd.GeoDataFrame(geometry=polys, crs=crs)
+    shp = out_dir / f"{stem}.shp"
+    gdf.to_file(shp)
+    print(f"✓ wrote {shp} ({len(gdf)} polygons)")
+
+    # optional PNG preview
+    import imageio
+    import matplotlib.pyplot as plt
+    png = out_dir / f"{stem}.png"
+    imageio.imwrite(png, (raster[::-1] * 255).astype("uint8"))
+    print(f"✓ wrote {png}")
+
+
 def get_bounds_from_kml(kml_string):
     """
     Given the text content of a SPLAT! KML coverage file, return a list of floats of the form ``[min_lon, min_lat, max_lon, max_lat]`` which describes the longitude-latitude bounding box of the coverage file.
@@ -617,14 +692,17 @@ def get_bounds_from_kml(kml_string):
 
 def compute_coverage(in_path, out_path, transmitters=None,
                      receiver_sensitivity=cs.RECEIVER_SENSITIVITY,
-                     coverage_radius=cs.COVERAGE_RADIUS,
-                     keep_ppm=False, high_definition=False, make_shp=False):
+                     high_definition=False):
     """
     Produce coverage reports by running :func:`compute_coverage_0` and then run :func:`post_process_coverage_0`.
     """
-    compute_coverage_0(in_path, out_path, transmitters, receiver_sensitivity,
-                       coverage_radius, high_definition)
-    postprocess_coverage_0(out_path, keep_ppm, make_shp)
+    compute_coverage_0(in_path, out_path, transmitters,
+                       high_definition)
+
+    # Process each .dat file individually
+    out_path = Path(out_path)
+    for dat_file in out_path.glob("*.dat"):
+        post_process_coverage_1(dat_file, receiver_sensitivity)
 
 
 def partition(width, height, n=3):
