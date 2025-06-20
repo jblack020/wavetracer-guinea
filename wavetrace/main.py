@@ -18,11 +18,22 @@ import requests
 from tqdm import tqdm
 import wavetrace.constants as cs
 import wavetrace.utilities as ut
+import math
 
 # In the calls to the subprocess function below,
 # sometimes instead of using absolute paths,
 # i use relative paths in combination with the ``cwd`` option.
 # Mind the difference!
+
+
+def dbuvm_to_dbm(e_dbuvm: float, f_mhz: float, g_dbi: float = 0.0) -> float:
+    """
+    60 dBµV/m → ? dBm for a given frequency.
+
+    Formula (ITU-R, FCC, SPLAT! docs):
+        P(dBm) = E(dBµV/m) - 77.2 - 20·log10(f_MHz) + G(dBi)
+    """
+    return e_dbuvm - 77.2 - 20.0 * math.log10(f_mhz) + g_dbi
 
 
 def process_transmitters(in_path, out_path,
@@ -446,7 +457,7 @@ def process_topography(in_path, out_path, high_definition=False):
 # @ut.time_it
 
 
-def compute_coverage_0(in_path, out_path, transmitters=None,
+def compute_coverage_0(in_path, out_path, transmitters,
                        receiver_sensitivity=cs.RECEIVER_SENSITIVITY, high_definition=False):
     """
     Create a SPLAT! coverage report for every transmitter with data located at ``in_path``, or if ``transmitters`` is given, then every transmitter 
@@ -462,8 +473,8 @@ def compute_coverage_0(in_path, out_path, transmitters=None,
     INPUT:
         - ``in_path``: string or Path object specifying a directory; all the SPLAT! transmitter and elevation data should lie here
         - ``out_path``: string or Path object specifying a directory
-        - ``transmitters``: list of transmitter dictionaries (in the form output by :func:`read_transmitters`) to restrict to; if ``None``, then all transmitters in ``in_path`` will be used
-        - ``receiver_sensitivity``: float; measured in decibels; path loss threshold beyond which signal strength contours will not be plotted
+        - ``transmitters``: list of transmitter dictionaries (in the form output by :func:`read_transmitters`) to grab the frequencies of to convert dBμV/m to dBm (SPLAT! uses dBm)
+        - ``receiver_sensitivity``: float; desired path loss threshold beyond which signal strength contours will not be plotted (measured in dBμV/m)
         - ``high_definition``: boolean
 
     OUTPUT:
@@ -479,6 +490,9 @@ def compute_coverage_0(in_path, out_path, transmitters=None,
     if not out_path.exists():
         out_path.mkdir(parents=True)
 
+    # Quick lookup table for transmitter names
+    tx_index = {t['name']: t for t in transmitters or []}
+
     # Get transmitter names
     if transmitters is not None:
         transmitter_names = [t['name'] for t in transmitters]
@@ -492,8 +506,12 @@ def compute_coverage_0(in_path, out_path, transmitters=None,
         splat += '-hd'
 
     for t in tqdm(transmitter_names, total=len(transmitter_names), desc="Computing coverage"):
+        f_mhz = tx_index[t]['frequency']          # each tx has its own freq
+        rx_thresh = dbuvm_to_dbm(receiver_sensitivity,
+                                 f_mhz)     # 60 dBµV/m → dBm
+
         args = [splat, '-t', t + '.qth', '-L', '8.0', '-dbm', '-db',
-                str(receiver_sensitivity), '-metric', '-ngs', '-kml', '-ppm',
+                str(rx_thresh), '-metric', '-ngs', '-kml', '-ppm',
                 '-o', t + '.ppm']
         subprocess.run(args, cwd=str(in_path),
                        stdout=subprocess.PIPE, universal_newlines=True, check=True)

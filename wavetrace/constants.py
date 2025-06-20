@@ -135,7 +135,7 @@ FRACTION_OF_SITUATIONS = 0.5
 
 #: SPLAT receiver sensitivity parameter in decibel-milliwatts (dBm).
 #: For example, minimum received signal power of wireless networks (802.11 variants) is -100 dBm.
-RECEIVER_SENSITIVITY = -110
+RECEIVER_SENSITIVITY = 43  # dBμV/m
 #: WGS84 semimajor axis in meters
 WGS84_A = 6378137
 #: WGS84 flattening
