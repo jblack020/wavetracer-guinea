@@ -201,7 +201,7 @@ def build_splat_qth(transmitter):
     """
     t = transmitter
     # Convert to degrees east in range (-360, 0] for SPLAT!
-    lon = t['longitude']
+    lon = -t['longitude']
     return "{!s}\n{!s}\n{!s}\n{!s}m".format(
         t['name'],
         t['latitude'],
