@@ -458,7 +458,9 @@ def process_topography(in_path, out_path, high_definition=False):
 
 
 def compute_coverage_0(in_path, out_path, transmitters,
-                       receiver_sensitivity=cs.RECEIVER_SENSITIVITY, high_definition=False):
+                       receiver_sensitivity=cs.RECEIVER_SENSITIVITY,
+                       coverage_radius=cs.COVERAGE_RADIUS,
+                       high_definition=False):
     """
     Create a SPLAT! coverage report for every transmitter with data located at ``in_path``, or if ``transmitters`` is given, then every transmitter 
     in that list with data data located at ``in_path``.
@@ -475,6 +477,7 @@ def compute_coverage_0(in_path, out_path, transmitters,
         - ``out_path``: string or Path object specifying a directory
         - ``transmitters``: list of transmitter dictionaries (in the form output by :func:`read_transmitters`) to grab the frequencies of to convert dBμV/m to dBm (SPLAT! uses dBm)
         - ``receiver_sensitivity``: float; desired path loss threshold beyond which signal strength contours will not be plotted (measured in dBμV/m)
+        - ``coverage_radius``: float; maximum coverage radius in kilometers for SPLAT calculations
         - ``high_definition``: boolean
 
     OUTPUT:
@@ -512,7 +515,8 @@ def compute_coverage_0(in_path, out_path, transmitters,
 
         print(f"Transmitter {t} has sensitivity {rx_thresh} dBm")
 
-        args = [splat, '-t', t + '.qth', '-L', '8.0', '-dbm', '-db',
+        # build splat argument list
+        args = [splat, '-t', t + '.qth', '-L', '8.0', '-R', str(coverage_radius), '-dbm', '-db',
                 str(rx_thresh), '-metric', '-ngs', '-kml', '-ppm',
                 '-o', t + '.ppm']
         subprocess.run(args, cwd=str(in_path),
@@ -613,13 +617,14 @@ def get_bounds_from_kml(kml_string):
 
 
 def compute_coverage(in_path, out_path, transmitters=None,
-                     receiver_sensitivity=cs.RECEIVER_SENSITIVITY, keep_ppm=False,
-                     high_definition=False, make_shp=False):
+                     receiver_sensitivity=cs.RECEIVER_SENSITIVITY,
+                     coverage_radius=cs.COVERAGE_RADIUS,
+                     keep_ppm=False, high_definition=False, make_shp=False):
     """
     Produce coverage reports by running :func:`compute_coverage_0` and then run :func:`post_process_coverage_0`.
     """
     compute_coverage_0(in_path, out_path, transmitters, receiver_sensitivity,
-                       high_definition)
+                       coverage_radius, high_definition)
     postprocess_coverage_0(out_path, keep_ppm, make_shp)
 
 

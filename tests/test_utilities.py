@@ -1,5 +1,5 @@
 import unittest
-from pathlib import Path 
+from pathlib import Path
 from shapely.geometry import Point
 
 from .context import wavetrace
@@ -40,8 +40,8 @@ class TestUtilities(unittest.TestCase):
         self.assertEqual(get, expect)
 
     def test_get_bounds(self):
-        for precision, delta in [(None, 0), ('SRTM1', 0.5/3600), 
-          ('SRTM3', 1.5/3600)]:
+        for precision, delta in [(None, 0), ('SRTM1', 0.5/3600),
+                                 ('SRTM3', 1.5/3600)]:
             get = get_bounds('N03E027', precision)
             expect = [27 - delta, 3 - delta, 28 + delta, 4 + delta]
             self.assertSequenceEqual(get, expect)
@@ -74,15 +74,15 @@ class TestUtilities(unittest.TestCase):
 
     def test_compute_intersecting_tiles(self):
         geometries = [
-          Point((174.3, -35.7)), 
-          Point((168.6, -45.2)).buffer(1, 1), # square buffer
-          ]
+            Point((174.3, -35.7)),
+            Point((168.6, -45.2)).buffer(1, 1),  # square buffer
+        ]
         get = compute_intersecting_tiles(geometries)
-        expect = ['S36E174', 
-          'S45E167', 'S45E168', 'S45E169', 
-          'S46E167', 'S46E168', 'S46E169', 
-          'S47E168',
-          ]
+        expect = ['S36E174',
+                  'S45E167', 'S45E168', 'S45E169',
+                  'S46E167', 'S46E168', 'S46E169',
+                  'S47E168',
+                  ]
         self.assertCountEqual(get, expect)
 
     def test_gdalinfo(self):
