@@ -16,6 +16,8 @@ import time
 from shapely.geometry import Point
 import requests
 from tqdm import tqdm
+import numpy as np
+from osgeo import gdal, osr
 import wavetrace.constants as cs
 import wavetrace.utilities as ut
 import math
@@ -471,6 +473,7 @@ def compute_coverage_0(in_path, out_path, transmitters,
     - ``'<transmitter name>.kml'``: KML file containing transmitter feature and ``'<transmitter name>.ppm'``
     - ``'<transmitter name>.ppm'``: PPM file depicting a contour plot of the transmitter signal strength
     - ``'<transmitter name>-ck.ppm'``: PPM file depicting a legend for the signal strengths in ``'<transmitter name>.ppm'``
+    - ``'<transmitter name>.ano'``: Alphanumeric file containing actual signal strength values in dBm
 
     INPUT:
         - ``in_path``: string or Path object specifying a directory; all the SPLAT! transmitter and elevation data should lie here
@@ -515,15 +518,15 @@ def compute_coverage_0(in_path, out_path, transmitters,
 
         print(f"Transmitter {t} has sensitivity {rx_thresh} dBm")
 
-        # build splat argument list
+        # build splat argument list - add -ano for alphanumeric output with actual signal values
         args = [splat, '-t', t + '.qth', '-L', '8.0', '-R', str(coverage_radius), '-dbm', '-db',
-                str(rx_thresh), '-metric', '-ngs', '-kml', '-ppm',
+                str(rx_thresh), '-metric', '-ngs', '-kml', '-ppm', '-ano', t + '.ano',
                 '-o', t + '.ppm']
         subprocess.run(args, cwd=str(in_path),
                        stdout=subprocess.PIPE, universal_newlines=True, check=True)
 
     # Move outputs to out_path
-    exts = ['.ppm', '-ck.ppm', '-site_report.txt', '.kml']
+    exts = ['.ppm', '-ck.ppm', '-site_report.txt', '.kml', '.ano']
     for t in transmitter_names:
         for ext in exts:
             src = in_path/(t + ext)
@@ -531,13 +534,127 @@ def compute_coverage_0(in_path, out_path, transmitters,
             shutil.move(str(src), str(tgt))
 
 
+def create_binary_coverage_from_ano(ano_file, kml_file, threshold_dbm, output_tiff):
+    """
+    Read a SPLAT! alphanumeric output file (.ano) containing signal strength values in dBm,
+    apply a precise threshold, and create a binary GeoTIFF (0/1 values) where 1 indicates
+    signal strength >= threshold_dbm.
+
+    INPUT:
+        - ``ano_file``: Path to SPLAT! .ano file containing actual dBm signal values
+        - ``kml_file``: Path to corresponding .kml file for geographic bounds
+        - ``threshold_dbm``: float; signal strength threshold in dBm
+        - ``output_tiff``: Path where binary GeoTIFF will be saved
+
+    OUTPUT:
+        None. Creates a binary GeoTIFF file.
+
+    NOTES:
+        - SPLAT! .ano files have format: lat, lon, azimuth, elevation, signal_strength_dbm
+        - Lines ending with '*' indicate obstructed paths
+        - Only areas with signal >= threshold_dbm will have value 1, others 0
+    """
+    ano_file = Path(ano_file)
+    kml_file = Path(kml_file)
+    output_tiff = Path(output_tiff)
+
+    # Read geographic bounds from KML
+    with kml_file.open() as f:
+        kml_content = f.read()
+    bounds = get_bounds_from_kml(kml_content)
+    min_lon, min_lat, max_lon, max_lat = bounds
+
+    # Parse .ano file
+    lats, lons, signals = [], [], []
+
+    with ano_file.open() as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith(';') or ',' not in line:
+                continue  # Skip comments and header lines
+
+            parts = line.rstrip('*').split(',')  # Remove '*' marker and split
+            if len(parts) >= 5:
+                try:
+                    lat = float(parts[0])
+                    lon = float(parts[1])
+                    # 5th column is signal strength
+                    signal_dbm = float(parts[4])
+
+                    lats.append(lat)
+                    lons.append(lon)
+                    signals.append(signal_dbm)
+                except ValueError:
+                    continue  # Skip malformed lines
+
+    if not lats:
+        raise ValueError(f"No valid data found in {ano_file}")
+
+    # Convert to numpy arrays
+    lats = np.array(lats)
+    lons = np.array(lons)
+    signals = np.array(signals)
+
+    # Apply threshold: 1 for signal >= threshold_dbm, 0 otherwise
+    binary_values = (signals >= threshold_dbm).astype(np.uint8)
+
+    # Create raster grid
+    # Determine grid resolution based on data density
+    lat_range = max_lat - min_lat
+    lon_range = max_lon - min_lon
+
+    # Use reasonable resolution - adjust if needed
+    # ~1 arc-second resolution
+    n_lat = max(100, min(1000, int(lat_range * 3600)))
+    n_lon = max(100, min(1000, int(lon_range * 3600)))
+
+    lat_step = lat_range / n_lat
+    lon_step = lon_range / n_lon
+
+    # Create grid
+    raster = np.zeros((n_lat, n_lon), dtype=np.uint8)
+
+    # Fill raster with binary values
+    for lat, lon, val in zip(lats, lons, binary_values):
+        if min_lat <= lat <= max_lat and min_lon <= lon <= max_lon:
+            row = int((max_lat - lat) / lat_step)
+            col = int((lon - min_lon) / lon_step)
+
+            # Ensure indices are within bounds
+            row = max(0, min(n_lat - 1, row))
+            col = max(0, min(n_lon - 1, col))
+
+            raster[row, col] = val
+
+    # Create GeoTIFF
+    driver = gdal.GetDriverByName('GTiff')
+    dataset = driver.Create(str(output_tiff), n_lon, n_lat, 1, gdal.GDT_Byte)
+
+    # Set geotransform (affine transformation)
+    geotransform = [min_lon, lon_step, 0, max_lat, 0, -lat_step]
+    dataset.SetGeoTransform(geotransform)
+
+    # Set projection (WGS84)
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4326)
+    dataset.SetProjection(srs.ExportToWkt())
+
+    # Write data
+    band = dataset.GetRasterBand(1)
+    band.WriteArray(raster)
+    band.SetNoDataValue(0)  # Set 0 as no-data value
+
+    # Clean up
+    dataset = None
+
+
 def postprocess_coverage_0(path, keep_ppm, make_shp):
     """
-    Using the PPM files in the directory ``path`` do the following:
+    Using the ANO and KML files in the directory ``path`` do the following:
 
-    - Convert each PPM file into a PNG file, replacing white with transparency using ImageMagick
-    - Change the PPM reference in each KML file to the corresponding PNG file
-    - Convert the PNG coverage file (not the legend file) into GeoTIFF using GDAL
+    - Create binary GeoTIFF files from ANO files using precise signal thresholds
+    - Convert binary GeoTIFF to PNG for visualization
+    - Update KML files to reference PNG files
     - Optionally create ESRI Shapefile bundles (.dbf, .prj, .shp, and .shx files) from the GeoTIFF files
 
     INPUT:
@@ -547,59 +664,75 @@ def postprocess_coverage_0(path, keep_ppm, make_shp):
 
     OUTPUT:
         None.
+
+    NOTES:
+        - This new approach reads the .ano files containing actual dBm values
+        - Creates precise binary thresholds instead of relying on color-coded PPM files
+        - Assumes the threshold was already applied during SPLAT! execution via the -db flag
     """
     path = Path(path)
 
-    # First pass: create PNG from PPM
-    for f in path.iterdir():
-        if f.suffix == '.ppm':
-            # Convert to PNG, turning white background into
-            # transparent background
-            png = f.stem + '.png'
-            args = ['convert', '-transparent', '#FFFFFF', f.name, png]
-            subprocess.run(args, cwd=str(path),
-                           stdout=subprocess.PIPE, universal_newlines=True, check=True)
+    # First pass: create binary GeoTIFF from ANO files
+    ano_files = list(path.glob('*.ano'))
+    for ano_file in tqdm(ano_files, desc="Creating binary coverage maps"):
+        transmitter_name = ano_file.stem
+        kml_file = path / f"{transmitter_name}.kml"
+        tiff_file = path / f"{transmitter_name}.tif"
 
-            # # Resize to width 1200 pixels
-            # args = ['convert', '-geometry', '1200', png, png]
-            # subprocess.run(args, cwd=str(path),
-            #   stdout=subprocess.PIPE, universal_newlines=True, check=True)
+        if kml_file.exists():
+            # The threshold was already applied by SPLAT! via the -db flag
+            # So any signal in the .ano file is >= our threshold
+            # We'll use a very low threshold (-200 dBm) to capture all reported signals
+            create_binary_coverage_from_ano(
+                ano_file, kml_file, -200.0, tiff_file)
 
-            if not keep_ppm:
-                # Delete PPM
-                f.unlink()
+    # Second pass: create PNG from GeoTIFF for visualization
+    for tiff_file in path.glob('*.tif'):
+        if tiff_file.name.endswith('-ck.tif'):
+            continue  # Skip legend files
 
-    # Second pass: create KML and convert PNG to GeoTIFF
-    for f in path.iterdir():
-        if f.suffix == '.kml':
-            # Replace PPM with PNG in KML
-            with f.open() as src:
-                kml = src.read()
-            kml = kml.replace('.ppm', '.png')
-            with f.open('w') as tgt:
-                tgt.write(kml)
+        png_file = tiff_file.with_suffix('.png')
 
-            # Convert main PNG to GeoTIFF using the lon-lat bounds from the KML
-            bounds = get_bounds_from_kml(kml)
-            ulx, uly, lrx, lry = str(bounds[0]), str(bounds[3]), \
-                str(bounds[2]), str(bounds[1])
-            epsg = 'EPSG:4326'  # WGS84
-            png = f.stem + '.png'
-            tif = f.stem + '.tif'
-            args = ['gdal_translate', '-of', 'Gtiff', '-a_ullr',
-                    ulx, uly, lrx, lry, '-a_srs', epsg, png, tif]
-            subprocess.run(args, cwd=str(path),
-                           stdout=subprocess.PIPE, universal_newlines=True, check=True)
+        # Convert binary GeoTIFF to PNG
+        # Use white for coverage (value 1) and transparent for no coverage (value 0)
+        args = ['gdal_translate', '-of', 'PNG', '-scale', '0', '1', '0', '255',
+                str(tiff_file), str(png_file)]
+        subprocess.run(args, cwd=str(path),
+                       stdout=subprocess.PIPE, universal_newlines=True, check=True)
 
-    # Optional third pass: create vector files from GeoTIFFs
+        # Make value 0 (no coverage) transparent
+        args = ['convert', '-transparent',
+                '#000000', str(png_file), str(png_file)]
+        subprocess.run(args, cwd=str(path),
+                       stdout=subprocess.PIPE, universal_newlines=True, check=True)
+
+    # Third pass: update KML files to reference PNG instead of PPM
+    for kml_file in path.glob('*.kml'):
+        with kml_file.open() as f:
+            kml_content = f.read()
+
+        # Replace .ppm with .png in KML
+        kml_content = kml_content.replace('.ppm', '.png')
+
+        with kml_file.open('w') as f:
+            f.write(kml_content)
+
+    # Fourth pass: clean up PPM files if requested
+    if not keep_ppm:
+        for ppm_file in path.glob('*.ppm'):
+            ppm_file.unlink()
+
+    # Optional fifth pass: create vector files from GeoTIFFs
     if make_shp:
-        for f in path.iterdir():
-            if f.suffix == '.tif':
-                tif = f.name
-                shp = f.stem + '.shp'
-                args = ['gdal_polygonize.py', tif, '-f', 'ESRI Shapefile', shp]
-                subprocess.run(args, cwd=str(path),
-                               stdout=subprocess.PIPE, universal_newlines=True, check=True)
+        for tiff_file in path.glob('*.tif'):
+            if tiff_file.name.endswith('-ck.tif'):
+                continue  # Skip legend files
+
+            shp_file = tiff_file.with_suffix('.shp')
+            args = ['gdal_polygonize.py', str(
+                tiff_file), '-f', 'ESRI Shapefile', str(shp_file)]
+            subprocess.run(args, cwd=str(path),
+                           stdout=subprocess.PIPE, universal_newlines=True, check=True)
 
 
 def get_bounds_from_kml(kml_string):

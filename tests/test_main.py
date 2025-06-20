@@ -187,7 +187,7 @@ class TestMain(unittest.TestCase):
         names_get = [f.name for f in p3.iterdir()]
         names_expect = [t['name'] + suffix
                         for t in read_transmitters(p1/'transmitters_single.csv')
-                        for suffix in ['.ppm', '-ck.ppm', '.kml', '-site_report.txt']]
+                        for suffix in ['.ppm', '-ck.ppm', '.kml', '-site_report.txt', '.ano']]
         self.assertCountEqual(names_get, names_expect)
 
         rm_paths(p2, p3)
@@ -217,7 +217,7 @@ class TestMain(unittest.TestCase):
         names_get = [f.name for f in p3.iterdir()]
         names_expect = [t['name'] + suffix
                         for t in transmitters
-                        for suffix in ['.ppm', '-ck.ppm', '.kml', '-site_report.txt',
+                        for suffix in ['.ppm', '-ck.ppm', '.kml', '-site_report.txt', '.ano',
                                        '.png', '-ck.png', '.tif', '.dbf', '.prj', '.shp', '.shx']]
         self.assertCountEqual(names_get, names_expect)
 
@@ -246,7 +246,7 @@ class TestMain(unittest.TestCase):
         names_get = [f.name for f in p3.iterdir()]
         names_expect = [t['name'] + suffix
                         for t in read_transmitters(p1/'transmitters_single.csv')
-                        for suffix in ['.kml', '-site_report.txt',
+                        for suffix in ['.kml', '-site_report.txt', '.ano',
                                        '.png', '-ck.png', '.tif', '.dbf', '.prj', '.shp', '.shx']]
         self.assertCountEqual(names_get, names_expect)
 
