@@ -511,40 +511,48 @@ def compute_coverage_0(in_path, out_path, transmitters,
                              if p.name.endswith('.qth')]
 
     # Splatify
-    splat = 'splat'
-    if high_definition:
-        splat += '-hd'
+    # splat = 'splat'
+    # if high_definition:
+    #     splat += '-hd'
 
-    for t in tqdm(transmitter_names, total=len(transmitter_names), desc="Computing coverage"):
-        power_erp = eirp_to_erp(tx_index[t]['power_eirp'])
+    # for t in tqdm(transmitter_names, total=len(transmitter_names), desc="Computing coverage"):
+    #     power_erp = eirp_to_erp(tx_index[t]['power_eirp'])
 
-        # build splat argument list
-        args = [
-            splat,
-            '-t', f'{t}.qth',
-            '-L', '8.0',  # Rx height (m or ft)
-            '-metric', '-ngs',  # Use metres, hide greyscale topo
-            '-kml',  # Google-Earth overlay (optional)
-            '-ano', f'{t}.dat',  # alphanumeric output file
-            '-o', f'{t}.ppm',  # Colour contour map
-            '-erp', str(power_erp)  # ERP
-        ]
+    #     # build splat argument list
+    #     args = [
+    #         splat,
+    #         '-t', f'{t}.qth',
+    #         '-L', '8.0',  # Rx height (m or ft)
+    #         '-metric', '-ngs',  # Use metres, hide greyscale topo
+    #         '-kml',  # Google-Earth overlay (optional)
+    #         '-ano', f'{t}.dat',  # alphanumeric output file
+    #         '-o', f'{t}.ppm',  # Colour contour map
+    #         '-erp', str(power_erp)  # ERP
+    #     ]
 
-        subprocess.run(
-            args,
-            cwd=str(in_path),
-            stdout=subprocess.PIPE,
-            universal_newlines=True,
-            check=True
-        )
+    #     subprocess.run(
+    #         args,
+    #         cwd=str(in_path),
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True,
+    #         check=True
+    #     )
 
+    # Move outputs to out_path
+    move_outputs(in_path, out_path, transmitter_names)
+
+
+def move_outputs(in_path, out_path, transmitter_names):
     # Move outputs to out_path
     exts = ['.ppm', '-ck.ppm', '-site_report.txt', '.kml', '.dat']
     for t in transmitter_names:
         for ext in exts:
             src = in_path/(t + ext)
             tgt = out_path/(t + ext)
-            shutil.move(str(src), str(tgt))
+            try:
+                shutil.move(str(src), str(tgt))
+            except FileNotFoundError:
+                print(f"File {src} not found")
 
 
 def postprocess_coverage_0(path, keep_ppm, make_shp):
