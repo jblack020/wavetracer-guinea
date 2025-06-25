@@ -261,34 +261,43 @@ def build_splat_lrp(transmitter,
 
 def build_splat_az(transmitter):
     """
-    Return the text (string) content of a SPLAT! azimuth file (AZ file) corresponding to the given transmitter.
+    Return the text (string) content of a SPLAT! azimuth file (AZ file)
+    corresponding to the given transmitter.
 
-    INPUT:
-        - ``transmitter``: dictionary of the same form as any one of the elements in the list output by :func:`read_transmitters`
+    If both ``bearing`` (boresight direction) and ``horizontal_beamwidth`` are
+    present, we create a simple three-level pattern:
 
-    OUTPUT:
-        String
+        • 0 dB (linear = 1.0) inside the main beam  
+        • 14 dB (linear ≈ 0.2) in the forward side-lobes  
+        • 26 dB (linear ≈ 0.05) in the rear lobe  
 
-    NOTES:
-        A transmitter with no ``'bearing'`` or ``'horizontal_beamwidth'`` data will produce the string ``'0  0'``.
+    Otherwise we fall back to the SPLAT! placeholder ``0  0`` (omnidirectional).
     """
-    t = transmitter
     try:
-        bearing = float(t['bearing'])
-        hb = float(t['horizontal_beamwidth'])
-        left = int(round(360 - (hb/2)))
-        right = int(round(hb/2))
-        s = '{!s}\n'.format(bearing)
-        for x in range(360):
-            if left <= x or x <= right:
-                normal = 0.9
-            else:
-                normal = 0.1
-            s += '{!s}  {!s}\n'.format(x, normal)
-    except:
-        s = '0  0\n'
+        bearing = float(transmitter["bearing"]) % 360          # degrees
+        hb = float(transmitter["horizontal_beamwidth"])    # degrees
 
-    return s[:-1]  # Drop the final new line
+        MAIN_GAIN = 1.0     # 0 dB
+        SIDE_GAIN = 0.2     # –14 dB
+        BACK_GAIN = 0.05    # –26 dB
+        half_bw = hb / 2
+
+        # first line = boresight
+        lines = [f"{bearing}"]
+        for deg in range(360):
+            # angle from boresight
+            rel = (deg - bearing) % 360
+            if rel <= half_bw or rel >= 360 - half_bw:          # main lobe
+                g = MAIN_GAIN
+            elif rel < 180:                                     # forward side-lobes
+                g = SIDE_GAIN
+            else:                                               # rear lobe
+                g = BACK_GAIN
+            lines.append(f"{deg}  {g:.3f}")
+        return "\n".join(lines)
+    except (KeyError, ValueError, TypeError):
+        # Missing or bad pattern info → omnidirectional placeholder
+        return "0  0"
 
 
 def build_splat_el(transmitter):
