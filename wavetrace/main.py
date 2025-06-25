@@ -38,15 +38,6 @@ from pathlib import Path
 # i use relative paths in combination with the ``cwd`` option.
 # Mind the difference!
 
-
-# Convert power_eirp to ERP for use in SPLAT!
-def eirp_to_erp(eirp: float) -> float:
-    """
-    Convert EIRP to ERP.
-    """
-    return eirp / 1.643
-
-
 def process_transmitters(in_path, out_path,
                          earth_dielectric_constant=cs.EARTH_DIELECTRIC_CONSTANT,
                          earth_conductivity=cs.EARTH_CONDUCTIVITY,
@@ -524,7 +515,7 @@ def compute_coverage_0(in_path, out_path, transmitters,
         splat += '-hd'
 
     for t in tqdm(transmitter_names, total=len(transmitter_names), desc="Computing coverage"):
-        power_erp = eirp_to_erp(tx_index[t]['power_eirp'])
+        power_erp = tx_index[t]['power_eirp']  # ERP
 
         # build splat argument list
         args = [
