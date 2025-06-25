@@ -174,7 +174,7 @@ def check_and_format_transmitters(transmitters):
         try:
             new_name = build_transmitter_name(t['network_name'],
                                               t['site_name'])
-            i = 0
+            i = 1
             while new_name in [t['name'] for t in new_transmitters]:
                 new_name = new_name + '_' + str(i)
                 i += 1
