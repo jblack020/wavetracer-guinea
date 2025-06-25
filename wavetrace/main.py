@@ -172,8 +172,14 @@ def check_and_format_transmitters(transmitters):
     new_transmitters = []
     for i, t in enumerate(transmitters):
         try:
-            t['name'] = build_transmitter_name(t['network_name'],
-                                               t['site_name'])
+            new_name = build_transmitter_name(t['network_name'],
+                                              t['site_name'])
+            i = 0
+            while new_name in [t['name'] for t in new_transmitters]:
+                new_name = new_name + '_' + str(i)
+                i += 1
+            t['name'] = new_name
+
             for key in ['latitude', 'longitude', 'antenna_height',
                         'polarization', 'frequency', 'power_eirp']:
                 t[key] = float(t[key])
