@@ -510,6 +510,8 @@ def compute_coverage_0(in_path, out_path, transmitters,
         transmitter_names = [p.stem for p in in_path.iterdir()
                              if p.name.endswith('.qth')]
 
+    print(f"Transmitter names: {transmitter_names}")
+
     # Splatify
     # splat = 'splat'
     # if high_definition:
