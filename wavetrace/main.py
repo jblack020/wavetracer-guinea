@@ -536,6 +536,7 @@ def compute_coverage_0(in_path, out_path, transmitters,
             '-ano', f'{t}.dat',  # alphanumeric output file
             '-o', f'{t}.ppm',  # Colour contour map
             '-erp', str(power_erp)  # ERP
+            
         ]
 
         subprocess.run(

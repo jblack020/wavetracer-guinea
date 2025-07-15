@@ -128,7 +128,7 @@ EARTH_CONDUCTIVITY = 0.005
 RADIO_CLIMATE = 3
 
 #: SPLAT! time variability parameter
-FRACTION_OF_TIME = 0.5
+FRACTION_OF_TIME = 0.7
 
 #: SPLAT! location variability parameter
 FRACTION_OF_SITUATIONS = 0.5
